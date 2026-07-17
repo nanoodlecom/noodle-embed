@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>noodle-embed demo</title>
+<script type="module" src="./noodle-embed.mjs"></script>
+<style>
+  body { max-width: 720px; margin: 2rem auto; padding: 0 1rem; font: 16px/1.5 system-ui, sans-serif; }
+</style>
+<h1>noodle-embed demo</h1>
+<p>A nanoodle workflow, rendered read-only from its share link — decoded
+entirely in your browser, no fetch:</p>
+<noodle-embed src="https://nanoodle.com/#g=H4sIAAAAAAAAA03PwWrDMBCE4VdZ5rwB202h6Dl6KzmISHaXWCsjb0KM0bsXk5r4PHP4_hUPuJahOcQZ7meFBDhoC4YtU4SDxaeB8YT7ahgLXNs1jF7iGGa49bU7eCox0OQ1ePKzlaz-bhSK9CY6UH7EQhqznkYx-s63JZM3Uhl-jekqGpM3uTJ9fKaEWnmXdG-JJD_EF-Xc_Vuao6XWC2MUvR1Sxi2lLzlt1i1zz5tysT2vMiwfD937MJWcJkOtl_oHaw3NGy4BAAA"></noodle-embed>
+<p>Taller, with a custom height:</p>
+<noodle-embed height="420" src="https://nanoodle.com/#g=H4sIAAAAAAAAA03PwWrDMBCE4VdZ5rwB202h6Dl6KzmISHaXWCsjb0KM0bsXk5r4PHP4_hUPuJahOcQZ7meFBDhoC4YtU4SDxaeB8YT7ahgLXNs1jF7iGGa49bU7eCox0OQ1ePKzlaz-bhSK9CY6UH7EQhqznkYx-s63JZM3Uhl-jekqGpM3uTJ9fKaEWnmXdG-JJD_EF-Xc_Vuao6XWC2MUvR1Sxi2lLzlt1i1zz5tysT2vMiwfD937MJWcJkOtl_oHaw3NGy4BAAA"></noodle-embed>
+<p>A broken link degrades to the button:</p>
+<noodle-embed src="https://nanoodle.com/#g=notavalidpayload"></noodle-embed>
+</html>

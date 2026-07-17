@@ -1,0 +1,30 @@
+{
+  "name": "noodle-embed",
+  "version": "0.1.0",
+  "description": "Embed a nanoodle workflow, rendered read-only, in any page — one ES module, zero dependencies, decodes the share link locally.",
+  "type": "module",
+  "main": "./noodle-embed.mjs",
+  "exports": {
+    ".": "./noodle-embed.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "noodle-embed.mjs"
+  ],
+  "sideEffects": true,
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "nanoodle",
+    "embed",
+    "web-component",
+    "workflow",
+    "ai"
+  ],
+  "repository": "github:nanoodlecom/noodle-embed",
+  "license": "MIT"
+}
