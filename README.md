@@ -49,6 +49,12 @@ Behavior worth knowing:
   the wires between them. Running happens one click away, in nanoodle.
 - **Graceful fallback.** An undecodable `src` still renders the frame and the
   Open-in-nanoodle button — a broken preview never becomes a dead end.
+  Missing or removed sources show the same fallback; unsafe URL schemes
+  target the nanoodle home page. Encoded and decoded payloads are limited
+  to 8 MiB.
+- **Responsive lifecycle.** Source changes cancel pending decodes. Height and
+  container-width changes redraw the current graph without decoding it again;
+  disconnected elements release their observer and cancel pending work.
 - **Full share URLs only.** `link.nanoodle.com` short links can't be decoded
   without a network round-trip, so embed the full-length link (the graph is
   in the fragment). The share popover's copy button gives you exactly that.
@@ -71,7 +77,8 @@ browsers.
 - Live run inside the embed via [nanoodle-js](https://github.com/nanoodlecom/nanoodle-js)
   (`nanoodle/browser`), bring-your-own-key — the engine already runs in
   browsers; the embed just needs a key affordance that meets the privacy bar.
-- npm publish + CDN copy-paste snippet.
+- CDN copy-paste snippet. The existing npm release is `0.1.0`; source changes
+  on `main` require a separate package release before npm consumers receive them.
 
 ## License
 

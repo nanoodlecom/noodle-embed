@@ -13,9 +13,13 @@
  *   #a=  base64url(gzip(app JSON))        #a=u base64url(app JSON)
  * App payloads contribute their `graph` (and `name`, used as the title). */
 export function b64urlToBytes(s) {
+  // Bound the input before atob allocates, including uncompressed fragments.
+  if (s.length > Math.ceil(MAX_INFLATED_BYTES / 3) * 4) throw new Error("payload too large");
   s = s.replace(/-/g, "+").replace(/_/g, "/");
   while (s.length % 4) s += "=";
-  const bin = atob(s), out = new Uint8Array(bin.length);
+  const bin = atob(s);
+  if (bin.length > MAX_INFLATED_BYTES) throw new Error("payload too large");
+  const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
@@ -23,22 +27,31 @@ export function b64urlToBytes(s) {
 /** Decompressed-size ceiling — a hostile embed src must not balloon memory. */
 const MAX_INFLATED_BYTES = 8 * 1024 * 1024;
 
-export async function gunzipText(bytes, maxBytes = MAX_INFLATED_BYTES) {
+export async function gunzipText(bytes, maxBytes = MAX_INFLATED_BYTES, signal) {
+  signal?.throwIfAborted();
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
   const reader = stream.getReader();
   const chunks = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) { await reader.cancel(); throw new Error("payload too large"); }
-    chunks.push(value);
+  const abort = () => { void reader.cancel().catch(() => {}); };
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      signal?.throwIfAborted();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) { await reader.cancel(); throw new Error("payload too large"); }
+      chunks.push(value);
+    }
+    const out = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) { out.set(c, off); off += c.byteLength; }
+    return new TextDecoder().decode(out);
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    reader.releaseLock();
   }
-  const out = new Uint8Array(total);
-  let off = 0;
-  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
-  return new TextDecoder().decode(out);
 }
 
 /**
@@ -46,17 +59,18 @@ export async function gunzipText(bytes, maxBytes = MAX_INFLATED_BYTES) {
  * {graph, name} — name only when an app payload carries one.
  * Throws on anything undecodable; the element catches and falls back.
  */
-export async function decodeShareUrl(src) {
+export async function decodeShareUrl(src, { signal } = {}) {
+  signal?.throwIfAborted();
   const hash = src.startsWith("#") ? src : new URL(src).hash;
   let m;
   if ((m = hash.match(/^#([gj])=(.+)$/))) {
     const bytes = b64urlToBytes(m[2]);
-    const json = m[1] === "g" ? await gunzipText(bytes) : new TextDecoder().decode(bytes);
+    const json = m[1] === "g" ? await gunzipText(bytes, MAX_INFLATED_BYTES, signal) : new TextDecoder().decode(bytes);
     return { graph: JSON.parse(json), name: null };
   }
   if ((m = hash.match(/^#a=(u?)(.+)$/))) {
     const bytes = b64urlToBytes(m[2]);
-    const json = m[1] ? new TextDecoder().decode(bytes) : await gunzipText(bytes);
+    const json = m[1] ? new TextDecoder().decode(bytes) : await gunzipText(bytes, MAX_INFLATED_BYTES, signal);
     const app = JSON.parse(json);
     if (!app || typeof app !== "object" || !app.graph) throw new Error("app payload has no graph");
     return { graph: app.graph, name: typeof app.name === "string" ? app.name : null };
@@ -74,21 +88,23 @@ export const TYPE_META = { text:["📝","Text"], upload:["📷","Image input"], 
  */
 export function layoutGraph(graph, w, h, padX = 40, padY = padX) {
   const nodes = (graph && Array.isArray(graph.nodes) ? graph.nodes : [])
-    .filter((n) => n && typeof n.x === "number" && typeof n.y === "number" && typeof n.type === "string");
+    .filter((n) => n && Number.isFinite(n.x) && Number.isFinite(n.y) && typeof n.type === "string"
+      && Number.isFinite(n.x + (Number.isFinite(n.w) ? n.w : 220) / 2));
   if (!nodes.length) return null;
-  const cx = (n) => n.x + (typeof n.w === "number" ? n.w : 220) / 2;
+  const cx = (n) => n.x + (Number.isFinite(n.w) ? n.w : 220) / 2;
   const cy = (n) => n.y + 60;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const n of nodes) {
     x0 = Math.min(x0, cx(n)); x1 = Math.max(x1, cx(n));
     y0 = Math.min(y0, cy(n)); y1 = Math.max(y1, cy(n));
   }
+  if (!Number.isFinite(x1 - x0) || !Number.isFinite(y1 - y0)) return null;
   const iw = Math.max(1, w - 2 * padX), ih = Math.max(1, h - 2 * padY);
   const s = Math.min(iw / Math.max(1, x1 - x0), ih / Math.max(1, y1 - y0));
   const px = (n) => padX + (cx(n) - x0) * s + (iw - (x1 - x0) * s) / 2;
   const py = (n) => padY + (cy(n) - y0) * s + (ih - (y1 - y0) * s) / 2;
   const placed = nodes.map((n) => {
-    const meta = TYPE_META[n.type] || ["·", n.type];
+    const meta = Object.hasOwn(TYPE_META, n.type) ? TYPE_META[n.type] : ["·", n.type];
     const label = typeof n.name === "string" && n.name.trim() ? n.name.trim() : meta[1];
     return { id: n.id, x: px(n), y: py(n), emoji: meta[0], label };
   });
@@ -106,6 +122,7 @@ export function layoutGraph(graph, w, h, padX = 40, padY = padX) {
 export function openUrl(src) {
   if (src.startsWith("#")) return "https://nanoodle.com/" + src;
   const u = new URL(src);
+  if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error("expected an HTTP(S) share URL");
   return u.href;
 }
 
@@ -135,18 +152,58 @@ path { stroke:#4c4c5c; stroke-width:2.5; fill:none; }
 
 // Defined only in browsers — Node (tests) has no HTMLElement.
 const NoodleEmbed = typeof HTMLElement === "undefined" ? null : class NoodleEmbed extends HTMLElement {
+  #revision = 0;
+  #decode = null;
+  #observer = null;
+  #decoded = null;
   static get observedAttributes() { return ["src", "height"]; }
-  attributeChangedCallback() { if (this.isConnected) this.#render(); }
-  connectedCallback() { this.#render(); }
+  attributeChangedCallback(name) {
+    if (!this.isConnected) return;
+    if (name === "height") this.#draw();
+    else this.#render();
+  }
+  connectedCallback() {
+    if (!this.#observer && typeof ResizeObserver !== "undefined") {
+      let width = this.clientWidth;
+      this.#observer = new ResizeObserver(() => {
+        if (width === this.clientWidth) return;
+        width = this.clientWidth;
+        this.#draw();
+      });
+      this.#observer.observe(this);
+    }
+    this.#render();
+  }
+  disconnectedCallback() {
+    this.#revision++;
+    this.#decode?.abort();
+    this.#decode = null;
+    this.#observer?.disconnect();
+    this.#observer = null;
+  }
 
   async #render() {
+    const revision = ++this.#revision;
+    this.#decode?.abort();
+    const controller = this.#decode = new AbortController();
     const src = this.getAttribute("src") || "";
+    this.#decoded = null;
+    this.#draw();
+    let decoded = null;
+    try { decoded = await decodeShareUrl(src, { signal: controller.signal }); } catch {}
+    if (!this.isConnected || revision !== this.#revision) return;
+    this.#decode = null;
+    this.#decoded = decoded;
+    this.#draw();
+  }
+
+  #draw() {
+    if (!this.isConnected) return;
+    const src = this.getAttribute("src") || "";
+    const decoded = this.#decoded;
     const height = Math.max(160, Math.min(1200, Number(this.getAttribute("height")) || 340));
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const link = (() => { try { return openUrl(src); } catch { return "https://nanoodle.com/"; } })();
-    let decoded = null;
-    try { decoded = await decodeShareUrl(src); } catch {}
-    if (this.getAttribute("src") !== src) return; // superseded by a newer render
     // Pad enough that a node BOX (max-width 200, centered on its point) stays
     // inside the frame, shrinking on narrow embeds rather than overflowing.
     const width = this.clientWidth || 640;
