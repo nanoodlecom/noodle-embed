@@ -107,3 +107,28 @@ test("TYPE_META covers the editor's node registry", () => {
     assert.ok(TYPE_META[key], key);
   }
 });
+
+test("unsafe navigation schemes are rejected even for undecodable links", () => {
+  for (const src of ["javascript:alert(1)", "data:text/html,hello", "file:///tmp/noodle"]) {
+    assert.throws(() => openUrl(src), /HTTP/);
+  }
+});
+
+test("plain and encoded inputs share the payload size limit", async () => {
+  await assert.rejects(decodeShareUrl("#j=" + "A".repeat(12 * 1024 * 1024)), /too large/);
+});
+
+test("malformed geometry does not poison valid nodes or inherit type metadata", () => {
+  const lay = layoutGraph({ nodes: [
+    { id: "good", type: "constructor", x: 0, y: 0, w: Infinity },
+    { id: "bad", type: "text", x: Infinity, y: 0 },
+    { id: "nan", type: "text", x: NaN, y: 0 },
+  ] }, 600, 300);
+  assert.equal(lay.nodes.length, 1);
+  assert.equal(lay.nodes[0].label, "constructor");
+  assert.equal(lay.nodes[0].emoji, "·");
+  assert.equal(lay.nodes[0].x, 300);
+  assert.equal(layoutGraph({ nodes: [
+    { type: "text", x: -1e308, y: 0 }, { type: "text", x: 1e308, y: 0 },
+  ] }, 600, 300), null);
+});
