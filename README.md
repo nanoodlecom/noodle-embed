@@ -77,8 +77,8 @@ browsers.
 - Live run inside the embed via [nanoodle-js](https://github.com/nanoodlecom/nanoodle-js)
   (`nanoodle/browser`), bring-your-own-key — the engine already runs in
   browsers; the embed just needs a key affordance that meets the privacy bar.
-- CDN copy-paste snippet. The existing npm release is `0.1.0`; source changes
-  on `main` require a separate package release before npm consumers receive them.
+- CDN copy-paste snippet. npm releases are versioned separately; source changes
+  on `main` require a package release before npm consumers receive them.
 
 ## License
 
