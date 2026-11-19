@@ -80,6 +80,16 @@ browsers.
 - CDN copy-paste snippet. npm releases are versioned separately; source changes
   on `main` require a package release before npm consumers receive them.
 
+## Publishing to npm
+
+Configure npm Trusted Publishing for `noodle-embed` with GitHub repository
+`nanoodlecom/noodle-embed`, workflow `test.yml`, environment `npm`, and direct
+publish enabled. The GitHub environment accepts `main` only.
+
+A version change on `main` runs the tests and publishes the resulting
+archive. To release an already-declared version, run the `test` workflow
+from `main` and enter that exact package version.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Not affiliated with NanoGPT. Build workflows at
