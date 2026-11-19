@@ -64,7 +64,7 @@ Behavior worth knowing:
 ## Development
 
 ```bash
-npm test          # node --test — decode, layout, fallback logic (Node 22.23.4+, 24.22.1+, or 26.12.1+)
+npm test          # node --test — decode, layout, fallback logic (Node 22.23.5+, 24.22.3+, or 26.13.1+)
 open demo.html    # serve the folder and eyeball the element
 ```
 
